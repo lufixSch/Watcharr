@@ -38,16 +38,16 @@
 
   let containerEl: HTMLDivElement;
 
-  const title = media.title || media.name;
+  $: title = media.title || media.name;
   // For now, if the content is on watched list, we can assume we have a local
   // cached image. Could be improved, since we could have a cached image for
   // show not on someone elses watched list.
-  const poster = id
+  $: poster = id
     ? `${baseURL}/img${media.poster_path}`
     : `https://image.tmdb.org/t/p/w500${media.poster_path}`;
-  const link = media.id ? `/${media.media_type}/${media.id}` : undefined;
-  const dateStr = media.release_date || media.first_air_date;
-  const year = dateStr ? new Date(dateStr).getFullYear() : undefined;
+  $: link = media.id ? `/${media.media_type}/${media.id}` : undefined;
+  $: dateStr = media.release_date || media.first_air_date;
+  $: year = dateStr ? new Date(dateStr).getFullYear() : undefined;
 
   function handleStarClick(r: number) {
     if (r == rating) return;
