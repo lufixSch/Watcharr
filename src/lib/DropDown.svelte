@@ -11,6 +11,7 @@
   export let blendIn: boolean = false;
   export let disabled = false;
   export let onChange: () => void = () => {};
+  export let showActiveElementsInOptions: boolean = false;
 
   let activeValue: string;
   let open = false;
@@ -77,7 +78,7 @@
     <Icon i="chevron" facing={open ? "up" : "down"} />
   </button>
   <ul bind:this={ulElement}>
-    {#each options.filter((o) => (typeof o === "string" ? o !== active : o.id !== active)) as o}
+    {#each showActiveElementsInOptions ? options : options.filter( (o) => (typeof o === "string" ? o !== active : o.id !== active) ) as o}
       <li>
         <button
           class="plain"
