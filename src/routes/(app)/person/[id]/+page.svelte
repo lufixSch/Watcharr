@@ -170,7 +170,7 @@
           </div>
         </div>
       </div>
-      <div class="filters container">
+      <div class="filters">
         <DropDown
           bind:active={sortOption}
           placeholder="Vote count"
@@ -203,16 +203,14 @@
     align-items: center;
     display: flex;
     justify-content: flex-end;
-    margin-bottom: -55px;
-    margin-top: 35px;
-  }
-  .container {
     margin: 0 auto;
-    min-width: 320px;
     padding-left: 20px;
     padding-right: 20px;
     width: 100%;
+    /* Same as in PosterList */
+    max-width: 1200px;
   }
+
   .content {
     position: relative;
     color: white;
