@@ -69,13 +69,12 @@
 
   function sortCredits(sortOption: string) {
     if (!credits || !credits.cast) return;
-    let sorted = [...credits.cast];
     switch (sortOption) {
       case "Vote count":
-        sorted.sort((a, b) => b.vote_count - a.vote_count);
+        credits.cast.sort((a, b) => b.vote_count - a.vote_count);
         break;
       case "Newest":
-        sorted.sort((a, b) => {
+        credits.cast.sort((a, b) => {
           const dateA = new Date(a.release_date || a.first_air_date).valueOf();
           const dateB = new Date(b.release_date || b.first_air_date).valueOf();
 
@@ -87,7 +86,7 @@
         });
         break;
       case "Oldest":
-        sorted.sort((a, b) => {
+        credits.cast.sort((a, b) => {
           const dateA = new Date(a.release_date || a.first_air_date).valueOf();
           const dateB = new Date(b.release_date || b.first_air_date).valueOf();
 
@@ -99,7 +98,7 @@
         });
         break;
     }
-    credits = { ...credits, cast: sorted };
+    credits.cast = credits.cast;
   }
 </script>
 
