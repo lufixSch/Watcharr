@@ -78,7 +78,7 @@
     <Icon i="chevron" facing={open ? "up" : "down"} />
   </button>
   <ul bind:this={ulElement}>
-    {#each options.filter( (o) => (typeof o === "string" ? showActiveElementsInOptions || o !== active : showActiveElementsInOptions || o.id !== active) ) as o}
+    {#each showActiveElementsInOptions ? options : options.filter( (o) => (typeof o === "string" ? o !== active : o.id !== active) ) as o}
       <li>
         <button
           class="plain"
