@@ -141,7 +141,7 @@
       console.debug("search: already running");
       return;
     }
-    if (curPage === maxContentPage) {
+    if (curPage >= maxContentPage) {
       console.debug("search: max page reached");
       return;
     }
