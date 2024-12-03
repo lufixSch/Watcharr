@@ -174,6 +174,20 @@ func (b *BaseRouter) addContentRoutes() {
 		c.JSON(http.StatusOK, content)
 	}))
 
+	// Search for content with external id
+	content.GET("/search/ext/:id/:source", cache.CachePage(b.ms, exp, func(c *gin.Context) {
+		if c.Param("id") == "" {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: "an id was not provided"})
+			return
+		}
+		content, err := searchByExternalId(c.Param("id"), c.Param("source"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, content)
+	}))
+
 	// Get movie details (for movie page)
 	content.GET("/movie/:id", WhereaboutsRequired(), cache.CachePage(b.ms, exp, func(c *gin.Context) {
 		if c.Param("id") == "" {
