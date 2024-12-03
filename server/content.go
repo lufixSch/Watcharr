@@ -323,6 +323,9 @@ func searchByExternalId(id string, source string) (TMDBSearchMultiResponse, erro
 	return TMDBSearchMultiResponse{TMDBSearchResponse: TMDBSearchResponse[TMDBSearchMultiResults]{
 		Results:      comb,
 		TotalResults: len(comb),
+		// Just providing these so we don't break frontend pagination logic.
+		TotalPages: 1,
+		Page:       1,
 	}}, nil
 }
 

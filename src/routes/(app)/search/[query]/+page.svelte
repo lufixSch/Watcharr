@@ -25,7 +25,7 @@
   import GamePoster from "@/lib/poster/GamePoster.svelte";
   import { get } from "svelte/store";
   import Icon from "@/lib/Icon.svelte";
-  import { afterNavigate } from "$app/navigation";
+  import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/stores";
 
   type GameWithMediaType = GameSearch & { media_type: "game" };
@@ -135,6 +135,43 @@
     }
   }
 
+  async function searchExternalId(id: string, provider: string) {
+    try {
+      return await axios.get<ContentSearch>(`/content/search/ext/${id}/${provider}`, {
+        signal: reqController.signal
+      });
+    } catch (err) {
+      console.error(`External id search failed!`, id, provider, err);
+      throw err;
+    }
+  }
+
+  function checkForExternalIdSearch(query: string) {
+    const spl = query.split(":");
+    if (spl.length !== 2) {
+      // Only ever accept one ':' in query.
+      console.debug(
+        "checkForExternalIdSearch: One lonely separator not found.. stopping check here."
+      );
+      return;
+    }
+    if (!spl[1]) {
+      console.info("checkForExternalIdSearch: No id found.");
+      return;
+    }
+    // Check if first part of query is a supported provider.
+    const p = spl[0]?.toLowerCase();
+    if (!p || (p !== "imdb" && p !== "youtube")) {
+      console.info("checkForExternalIdSearch: Invalid provider found:", p);
+      return;
+    }
+    console.debug("checkForExternalIdSearch: Found required params:", p, spl[1]);
+    return {
+      provider: p,
+      id: spl[1]
+    };
+  }
+
   async function search(query: string) {
     console.debug("search: query:", query);
     if (searchRunning) {
@@ -146,9 +183,30 @@
       return;
     }
     searchRunning = true;
+    const extProvider = checkForExternalIdSearch(query);
+    const isExtSearch = !!extProvider;
     reqController = new AbortController();
     try {
-      if (activeSearchFilter) {
+      if (isExtSearch) {
+        console.log("Search: Performing external id search.");
+        const resp = await searchExternalId(extProvider.id, extProvider.provider);
+        const data = resp.data;
+        if (!data || !data.results) {
+          console.warn("Search: No results from external id search.");
+          return;
+        }
+        if (data.results.length === 1 && data.results[0].media_type && data.results[0].id) {
+          console.info(
+            "Search: Only one result from external id search. Redirecting..",
+            data.results[0]
+          );
+          goto(`/${data.results[0].media_type}/${data.results[0].id}`);
+          return;
+        }
+        console.info("Search: Multiple results from external id search.");
+        allSearchResults.push(...data.results);
+        searchResults = allSearchResults;
+      } else if (activeSearchFilter) {
         // If we have a search filter selected, search for just one specific type of content.
         console.log("Search: A filter is active:", activeSearchFilter);
         let cdata;
