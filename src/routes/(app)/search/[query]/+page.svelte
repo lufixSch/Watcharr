@@ -160,10 +160,37 @@
       return;
     }
     // Check if first part of query is a supported provider.
-    const p = spl[0]?.toLowerCase();
-    if (!p || (p !== "imdb" && p !== "youtube")) {
-      console.info("checkForExternalIdSearch: Invalid provider found:", p);
-      return;
+    let p = spl[0]?.toLowerCase();
+    switch (p) {
+      // Default names that are supported right out of the box
+      case "imdb":
+      case "tvdb":
+      case "youtube":
+      case "wikidata":
+      case "facebook":
+      case "instagram":
+      case "twitter":
+      case "tiktok":
+        break;
+      // Any aliases we want to support
+      case "i":
+      case "imd":
+        p = "imdb";
+        break;
+      case "wd":
+      case "wdt":
+        p = "wikidata";
+        break;
+      case "yt":
+        p = "youtube";
+        break;
+      case "thetvdb":
+        p = "tvdb";
+        break;
+      // If none match, then is invalid provider.
+      default:
+        console.info("checkForExternalIdSearch: Invalid provider found:", p);
+        return;
     }
     console.debug("checkForExternalIdSearch: Found required params:", p, spl[1]);
     return {
@@ -206,6 +233,7 @@
         console.info("Search: Multiple results from external id search.");
         allSearchResults.push(...data.results);
         searchResults = allSearchResults;
+        curPage++;
       } else if (activeSearchFilter) {
         // If we have a search filter selected, search for just one specific type of content.
         console.log("Search: A filter is active:", activeSearchFilter);
