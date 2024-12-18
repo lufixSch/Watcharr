@@ -39,6 +39,7 @@ type ImportRequest struct {
 	WatchedEpisodes  []WatchedEpisode `json:"watchedEpisodes"`
 	WatchedSeason    []WatchedSeason  `json:"watchedSeasons"`
 	Tags             []TagAddRequest  `json:"tags"`
+	ImdbID           string           `json:"imdbId"`
 }
 
 type ImportResponse struct {
@@ -69,6 +70,22 @@ func importContent(db *gorm.DB, userId uint, ar ImportRequest) (ImportResponse, 
 			}
 			slog.Debug("import: by tmdbid of tv", "cr", cr)
 			return successfulImport(db, userId, cr.ID, SHOW, ar)
+		}
+	}
+	// If imdb id passed, attempt to get content with it
+	if ar.ImdbID != "" && (ar.Type == MOVIE || ar.Type == SHOW) {
+		if imdbResp, err := searchByExternalId(ar.ImdbID, "imdb"); err == nil {
+			if len(imdbResp.Results) == 1 && (imdbResp.Results[0].MediaType == string(MOVIE) || imdbResp.Results[0].MediaType == string(SHOW)) {
+				// Will only be one result
+				r := imdbResp.Results[0]
+				slog.Debug("import: importing imdb match", "imdb_id", ar.ImdbID, "tmdb_id_thatwasfound", r.ID)
+				return successfulImport(db, userId, r.ID, ContentType(r.MediaType), ar)
+			} else {
+				// Content in tmdb may just be missing a related imdb id, so allow search to continue by name below.
+				slog.Warn("import: No results for search by imdb id.. search will contiue by content name.", "rq", ar)
+			}
+		} else {
+			slog.Warn("import: Failed to get content by imdb id.. search will contiue by content name.", "rq", ar)
 		}
 	}
 	// tmdbId not passed.. search for the content by name.

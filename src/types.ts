@@ -42,6 +42,7 @@ export type Icon =
   | "myanimelist"
   | "todomovies"
   | "themoviedb"
+  | "imdb"
   | "refresh"
   | "gamepad"
   | "film"
@@ -901,6 +902,7 @@ export interface ImportedList {
   watchedEpisodes?: WatchedEpisode[];
   watchedSeasons?: WatchedSeason[];
   tags?: TagAddRequest[];
+  imdbId?: string;
 }
 
 export interface Filters {

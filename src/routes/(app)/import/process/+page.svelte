@@ -116,6 +116,70 @@
           });
         }
       }
+    } else if (list?.type === "imdb") {
+      // There are different types of imdb exports (ratings & watchlist/list),
+      // there are common keys between these types that we use below so should
+      // be okay with importing either.
+      importText = "IMDb";
+      const s = papa.parse(list.data.trim(), { header: true });
+      console.debug("parsed csv", s);
+      let anySkipped = false;
+      for (let i = 0; i < s.data.length; i++) {
+        try {
+          const el = s.data[i] as any;
+          if (el) {
+            const imdbId = el["Const"];
+            const type = el["Title Type"]?.toLowerCase();
+            // Skip if no name or tmdb id
+            if (!el.Title && !imdbId) {
+              console.warn("Skipping item with no title or imdb id", el);
+              anySkipped = true;
+              continue;
+            }
+            if (!type) {
+              console.warn("Skipping item with no type", el);
+              anySkipped = true;
+              continue;
+            }
+            const l: ImportedList = { name: el.Title };
+            const year = el["Release Date"] ? new Date(el["Release Date"]) : undefined;
+            if (year) {
+              l.year = String(year.getFullYear());
+            }
+            if (type === "movie") {
+              l.type = "movie";
+            } else if (type === "tv series") {
+              l.type = "tv";
+            } else {
+              console.warn("Skipping item with invalid type", el);
+              anySkipped = true;
+              continue;
+            }
+            if (imdbId) {
+              l.imdbId = imdbId;
+            }
+            if (el["Your Rating"]) {
+              l.rating = Math.floor(Number(el["Your Rating"]));
+            }
+            if (el["Date Rated"]) {
+              l.ratingCustomDate = new Date(el["Date Rated"]);
+            }
+            rList.push(l);
+          }
+        } catch (err) {
+          console.error("Failed to process an item!", err);
+          notify({
+            type: "error",
+            text: "Failed to process an item!"
+          });
+        }
+      }
+      if (anySkipped) {
+        notify({
+          type: "error",
+          text: "Some items with invalid data may have been skipped (check source data for missing ids/titles or look in console for more details)."
+        });
+      }
     } else if (list?.type === "movary") {
       importText = "Movary";
       try {
