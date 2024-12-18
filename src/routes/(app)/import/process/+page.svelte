@@ -151,7 +151,7 @@
             } else if (type === "tv series") {
               l.type = "tv";
             } else {
-              console.warn("Skipping item with invalid type", el);
+              console.warn("Skipping item with invalid type", `(${type})`, el);
               anySkipped = true;
               continue;
             }
