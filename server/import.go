@@ -73,13 +73,42 @@ func importContent(db *gorm.DB, userId uint, ar ImportRequest) (ImportResponse, 
 		}
 	}
 	// If imdb id passed, attempt to get content with it
-	if ar.ImdbID != "" && (ar.Type == MOVIE || ar.Type == SHOW) {
+	if ar.ImdbID != "" && (ar.Type == MOVIE || ar.Type == SHOW || ar.Type == SHOW_EPISODE) {
 		if imdbResp, err := searchByExternalId(ar.ImdbID, "imdb"); err == nil {
-			if len(imdbResp.Results) == 1 && (imdbResp.Results[0].MediaType == string(MOVIE) || imdbResp.Results[0].MediaType == string(SHOW)) {
-				// Will only be one result
-				r := imdbResp.Results[0]
-				slog.Debug("import: importing imdb match", "imdb_id", ar.ImdbID, "tmdb_id_thatwasfound", r.ID)
-				return successfulImport(db, userId, r.ID, ContentType(r.MediaType), ar)
+			if len(imdbResp.Results) == 1 {
+				onlyResult := imdbResp.Results[0]
+				if onlyResult.MediaType == string(MOVIE) || onlyResult.MediaType == string(SHOW) {
+					// Will only be one result
+					slog.Debug("import: importing imdb match", "imdb_id", ar.ImdbID, "tmdb_id_thatwasfound", onlyResult.ID)
+					return successfulImport(db, userId, onlyResult.ID, ContentType(onlyResult.MediaType), ar)
+				} else if onlyResult.MediaType == string(SHOW_EPISODE) {
+					// Handle episodes differently.
+					// Clients must import tv episodes last so that the actual show can be imported first
+					// will fail if watched entry isn't imported first or already exists (we won't make it here).
+					w, e := getWatchedItemByTmdbId(db, userId, uint(onlyResult.ShowId), "tv")
+					if e != nil {
+						slog.Error("import: imdb match: Failed to add watched episode (failed to find watched item, it must exist!).", "rq", ar, "error", err)
+						return ImportResponse{Type: IMPORT_FAILED}, nil
+					}
+					ws, err := addWatchedEpisodes(db, userId, WatchedEpisodeAddRequest{
+						WatchedID:       w.ID,
+						SeasonNumber:    onlyResult.SeasonNumber,
+						EpisodeNumber:   onlyResult.EpisodeNumber,
+						Status:          ar.Status,
+						Rating:          int8(ar.Rating),
+						addActivityDate: *ar.RatingCustomDate,
+					})
+					if err != nil {
+						slog.Error("import: imdb match: Failed to add watched episode.", "rq", ar, "error", err)
+						return ImportResponse{Type: IMPORT_FAILED}, nil
+					} else {
+						w.WatchedEpisodes = ws.WatchedEpisodes
+						return ImportResponse{Type: IMPORT_SUCCESS, WatchedEntry: w}, nil
+					}
+				} else {
+					slog.Error("import: imdb match has unsupported media type.", "media_type", imdbResp.Results[0].MediaType, "rq", ar)
+					return ImportResponse{Type: IMPORT_FAILED}, nil
+				}
 			} else {
 				// Content in tmdb may just be missing a related imdb id, so allow search to continue by name below.
 				slog.Warn("import: No results for search by imdb id.. search will contiue by content name.", "rq", ar)

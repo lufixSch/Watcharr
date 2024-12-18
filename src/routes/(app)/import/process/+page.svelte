@@ -126,9 +126,21 @@
       // there are common keys between these types that we use below so should
       // be okay with importing either.
       importText = "IMDb";
-      const s = papa.parse(list.data.trim(), { header: true });
+      const s = papa.parse<any>(list.data.trim(), { header: true });
       console.debug("parsed csv", s);
       let anySkipped = false;
+      // Sort so that episodes comes last, so they are imported last.
+      s.data?.sort((a, b) => {
+        const aType = a["Title Type"]?.toLowerCase();
+        if (aType === "tv episode") {
+          return 1;
+        }
+        const bType = b["Title Type"]?.toLowerCase();
+        if (bType === "tv episode") {
+          return -1;
+        }
+        return 0;
+      });
       for (let i = 0; i < s.data.length; i++) {
         try {
           const el = s.data[i] as any;
@@ -155,6 +167,8 @@
               l.type = "movie";
             } else if (type === "tv series") {
               l.type = "tv";
+            } else if (type === "tv episode") {
+              l.type = "tv_episode";
             } else {
               console.warn("Skipping item with invalid type", `(${type})`, el);
               anySkipped = true;
@@ -179,6 +193,10 @@
           });
         }
       }
+      notify({
+        text: "Any tv episodes will be added to the bottom of the table, don't change the Type on these!",
+        time: 20000
+      });
       if (anySkipped) {
         notify({
           type: "error",

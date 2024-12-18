@@ -18,6 +18,8 @@ type ContentType string
 const (
 	MOVIE ContentType = "movie"
 	SHOW  ContentType = "tv"
+	// Show episode
+	SHOW_EPISODE ContentType = "tv_episode"
 )
 
 var ContentStore = persistence.NewInMemoryStore(time.Hour * 24)

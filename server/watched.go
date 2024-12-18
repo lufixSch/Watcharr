@@ -104,6 +104,22 @@ func getWatchedItemById(db *gorm.DB, userId uint, id uint) (Watched, error) {
 	return *watched, nil
 }
 
+// Get a watched list item by content (tmdb) id (must be for `userId`).
+func getWatchedItemByTmdbId(db *gorm.DB, userId uint, tmdbId uint, contentType ContentType) (Watched, error) {
+	slog.Debug("getWatchedItemByTmdbId: Running.", "userId", userId, "tmdbId", tmdbId)
+	watched := new(Watched)
+	res := db.Model(&Watched{}).
+		Joins("Content").
+		Where("user_id = ? AND Content.tmdb_id = ? AND Content.type = ?", userId, tmdbId, contentType).
+		Take(&watched)
+	if res.Error != nil {
+		slog.Error("getWatchedItemByTmdbId: Failed!", "error", res.Error)
+		return Watched{}, res.Error
+	}
+	slog.Debug("getWatchedItemByTmdbId: Done.", "userId", userId, "tmdbId", tmdbId, "watched_item", watched)
+	return *watched, nil
+}
+
 // Get another users **public** watchlist.
 func getPublicWatched(db *gorm.DB, userId uint, username string) ([]Watched, error) {
 	slog.Debug("getPublicWatched running", "user_id", userId, "username", username)
