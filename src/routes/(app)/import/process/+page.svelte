@@ -22,12 +22,14 @@
     type ImportResponse,
     type ContentSearchTv,
     type ContentSearchMovie,
-    type ImportedList
+    type ImportedList,
+    type WatchedStatus
   } from "@/types";
   import axios from "axios";
   import { onDestroy } from "svelte";
   import { get } from "svelte/store";
   import papa from "papaparse";
+  import Status from "@/lib/Status.svelte";
 
   const wList = get(watchedList);
 
@@ -49,6 +51,9 @@
   // Set when current item being imported gets an IMPORT_MULTI
   // response, which then shows the modal for user to pick correct item.
   let importMultiItem: ImportedListItemMultiProblem | undefined;
+  // Set when user clicks 'Change Statuses' button for the change all
+  // statuses modal.
+  let changeAllStatusesModalCb: ((newStatus?: WatchedStatus) => void) | undefined;
 
   async function getList() {
     const list = get(importedList);
@@ -471,6 +476,39 @@
       }
     });
   }
+
+  /**
+   * Helper to allow user to quickly update
+   * all statuses to a new one.
+   */
+  function changeAllStatuses() {
+    changeAllStatusesModalCb = (newStatus) => {
+      try {
+        if (!newStatus) {
+          // User cancelled flow
+          changeAllStatusesModalCb = undefined;
+          return;
+        }
+        if (!rList) {
+          console.error("changeAllStatusesModalCb: No list to modify!");
+          changeAllStatusesModalCb = undefined;
+          return;
+        }
+        for (let i = 0; i < rList.length; i++) {
+          const r = rList[i];
+          r.status = newStatus;
+        }
+        rList = rList;
+      } catch (err) {
+        console.error("changeAllStatusesModalCb: Failed!", err);
+        notify({
+          type: "error",
+          text: "Failed when updating all statuses. Please try again!"
+        });
+      }
+      changeAllStatusesModalCb = undefined;
+    };
+  }
 </script>
 
 {#await getList()}
@@ -575,8 +613,19 @@
         </table>
         <div class="btns">
           <button on:click={() => goto("/import")}><Icon i="arrow" />Back</button>
+          <button on:click={() => changeAllStatuses()}>Change Statuses</button>
           <button on:click={startImport} disabled={isImporting}>Start Importing</button>
         </div>
+        {#if typeof changeAllStatusesModalCb === "function"}
+          <Modal
+            title="Select a New Status"
+            desc="Override the status for all content in the table"
+            maxWidth="600px"
+            onClose={() => changeAllStatusesModalCb}
+          >
+            <Status status={undefined} onChange={changeAllStatusesModalCb} />
+          </Modal>
+        {/if}
       {:else}
         <h2>No list</h2>
       {/if}
@@ -681,6 +730,7 @@
     display: flex;
     flex-flow: row;
     margin-top: 20px;
+    gap: 5px;
 
     button {
       width: max-content;
