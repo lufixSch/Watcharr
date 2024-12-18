@@ -484,6 +484,7 @@
   function changeAllStatuses() {
     changeAllStatusesModalCb = (newStatus) => {
       try {
+        console.debug("changeAllStatusesModalCb: newStatus:", newStatus);
         if (!newStatus) {
           // User cancelled flow
           changeAllStatusesModalCb = undefined;
@@ -621,7 +622,10 @@
             title="Select a New Status"
             desc="Override the status for all content in the table"
             maxWidth="600px"
-            onClose={() => changeAllStatusesModalCb}
+            onClose={() =>
+              typeof changeAllStatusesModalCb === "function"
+                ? changeAllStatusesModalCb()
+                : undefined}
           >
             <Status status={undefined} onChange={changeAllStatusesModalCb} />
           </Modal>
