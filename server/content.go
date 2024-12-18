@@ -18,6 +18,8 @@ type ContentType string
 const (
 	MOVIE ContentType = "movie"
 	SHOW  ContentType = "tv"
+	// Show episode
+	SHOW_EPISODE ContentType = "tv_episode"
 )
 
 var ContentStore = persistence.NewInMemoryStore(time.Hour * 24)
@@ -320,6 +322,8 @@ func searchByExternalId(id string, source string) (TMDBSearchMultiResponse, erro
 	comb = append(comb, resp.MovieResults...)
 	comb = append(comb, resp.TvResults...)
 	comb = append(comb, resp.PersonResults...)
+	comb = append(comb, resp.TvSeasonResults...)
+	comb = append(comb, resp.TvEpisodeResults...)
 	return TMDBSearchMultiResponse{TMDBSearchResponse: TMDBSearchResponse[TMDBSearchMultiResults]{
 		Results:      comb,
 		TotalResults: len(comb),

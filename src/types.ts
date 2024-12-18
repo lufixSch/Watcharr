@@ -1,5 +1,5 @@
 export type WatchedStatus = "PLANNED" | "WATCHING" | "FINISHED" | "HOLD" | "DROPPED";
-export type ContentType = "tv" | "movie";
+export type ContentType = "tv" | "movie" | "tv_episode";
 export type MediaType = ContentType | "person";
 
 // Wasn't able to figure out how to import this type from its component file in other places, so its here for now.

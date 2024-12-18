@@ -38,6 +38,15 @@ type TMDBSearchMultiResults struct {
 	OriginalName     string   `json:"original_name,omitempty"`
 	FirstAirDate     string   `json:"first_air_date,omitempty"`
 	OriginCountry    []string `json:"origin_country,omitempty"`
+	// Below are for tv episode results
+	AirDate        string `json:"air_date,omitempty"`
+	EpisodeNumber  int    `json:"episode_number,omitempty"`
+	EpisodeType    string `json:"episode_type,omitempty"`
+	ProductionCode string `json:"production_code,omitempty"`
+	Runtime        int    `json:"runtime,omitempty"`
+	SeasonNumber   int    `json:"season_number,omitempty"`
+	ShowId         int    `json:"show_id,omitempty"`
+	StillPath      string `json:"still_path,omitempty"`
 }
 
 type TMDBSearchMultiResponse struct {
@@ -126,12 +135,11 @@ type TMDBFindByExternalIdResponse struct {
 	// combine all of them into one []TMDBSearchMultiResults for response
 	// to client (seems not easy to convert to TMDBSearchMultiResults for
 	// concatenation after unmarshalling to correct type).
-	MovieResults  []TMDBSearchMultiResults `json:"movie_results"`
-	PersonResults []TMDBSearchMultiResults `json:"person_results"`
-	TvResults     []TMDBSearchMultiResults `json:"tv_results"`
-	// We don't currently support searching these:
-	// TvseasonResults  []any `json:"tv_season_results"`
-	// TvEpisodeResults []any `json:"tv_episode_results"`
+	MovieResults     []TMDBSearchMultiResults `json:"movie_results"`
+	PersonResults    []TMDBSearchMultiResults `json:"person_results"`
+	TvResults        []TMDBSearchMultiResults `json:"tv_results"`
+	TvSeasonResults  []TMDBSearchMultiResults `json:"tv_season_results"`
+	TvEpisodeResults []TMDBSearchMultiResults `json:"tv_episode_results"`
 }
 
 type TMDBContentDetails struct {
