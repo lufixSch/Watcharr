@@ -320,6 +320,8 @@ func searchByExternalId(id string, source string) (TMDBSearchMultiResponse, erro
 	comb = append(comb, resp.MovieResults...)
 	comb = append(comb, resp.TvResults...)
 	comb = append(comb, resp.PersonResults...)
+	comb = append(comb, resp.TvSeasonResults...)
+	comb = append(comb, resp.TvEpisodeResults...)
 	return TMDBSearchMultiResponse{TMDBSearchResponse: TMDBSearchResponse[TMDBSearchMultiResults]{
 		Results:      comb,
 		TotalResults: len(comb),

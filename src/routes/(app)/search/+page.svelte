@@ -239,8 +239,16 @@
             "Search: Only one result from external id search. Redirecting..",
             data.results[0]
           );
-          goto(`/${data.results[0].media_type}/${data.results[0].id}`);
-          return;
+          const mediaType = data.results[0].media_type;
+          if (mediaType !== "movie" && mediaType !== "tv" && mediaType !== "person") {
+            console.info(
+              "Search: Unsupported media type found in only result.. not redirecting.",
+              mediaType
+            );
+          } else {
+            goto(`/${data.results[0].media_type}/${data.results[0].id}`);
+            return;
+          }
         }
         console.info("Search: Multiple results from external id search.");
         allSearchResults.push(...data.results);
@@ -484,7 +492,7 @@
                 {...getPlayedDependedProps(w.id, wList)}
                 fluidSize
               />
-            {:else}
+            {:else if w.media_type === "movie" || w.media_type === "tv"}
               <Poster media={w} {...getWatchedDependedProps(w.id, w.media_type, wList)} fluidSize />
             {/if}
           {/each}
