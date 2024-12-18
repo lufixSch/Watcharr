@@ -57,6 +57,10 @@ export default function tooltip(node: HTMLElement, opts: ToolTipOptions) {
       node.removeEventListener("mouseout", hide);
       node.removeEventListener("touchend", hide);
       node.removeEventListener("click", hide);
+      // Running hide() here fixes scenario where we (eg) hide `node`
+      // after it is pressed, but tooltip persists and there is no way
+      // to remove it.
+      hide();
     }
   };
 }
