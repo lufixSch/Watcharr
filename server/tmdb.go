@@ -10,11 +10,11 @@ import (
 	"time"
 )
 
-type TMDBSearchMultiResponse struct {
-	Page         int                      `json:"page"`
-	Results      []TMDBSearchMultiResults `json:"results"`
-	TotalPages   int                      `json:"total_pages"`
-	TotalResults int                      `json:"total_results"`
+type TMDBSearchResponse[R any] struct {
+	Page         int `json:"page"`
+	Results      []R `json:"results"`
+	TotalPages   int `json:"total_pages"`
+	TotalResults int `json:"total_results"`
 }
 
 type TMDBSearchMultiResults struct {
@@ -38,86 +38,108 @@ type TMDBSearchMultiResults struct {
 	OriginalName     string   `json:"original_name,omitempty"`
 	FirstAirDate     string   `json:"first_air_date,omitempty"`
 	OriginCountry    []string `json:"origin_country,omitempty"`
+	// Below are for tv episode results
+	AirDate        string `json:"air_date,omitempty"`
+	EpisodeNumber  int    `json:"episode_number,omitempty"`
+	EpisodeType    string `json:"episode_type,omitempty"`
+	ProductionCode string `json:"production_code,omitempty"`
+	Runtime        int    `json:"runtime,omitempty"`
+	SeasonNumber   int    `json:"season_number,omitempty"`
+	ShowId         int    `json:"show_id,omitempty"`
+	StillPath      string `json:"still_path,omitempty"`
+}
+
+type TMDBSearchMultiResponse struct {
+	TMDBSearchResponse[TMDBSearchMultiResults]
+}
+
+type TMDBSearchMovieResult struct {
+	Adult            bool    `json:"adult"`
+	BackdropPath     string  `json:"backdrop_path"`
+	GenreIds         []int   `json:"genre_ids"`
+	ID               int     `json:"id"`
+	OriginalLanguage string  `json:"original_language"`
+	OriginalTitle    string  `json:"original_title"`
+	Overview         string  `json:"overview"`
+	Popularity       float64 `json:"popularity"`
+	PosterPath       string  `json:"poster_path"`
+	ReleaseDate      string  `json:"release_date"`
+	Title            string  `json:"title"`
+	Video            bool    `json:"video"`
+	VoteAverage      float64 `json:"vote_average"`
+	VoteCount        int     `json:"vote_count"`
+	MediaType        string  `json:"media_type"` // API req doesn't include this, we will add it in our service.
 }
 
 type TMDBSearchMoviesResponse struct {
-	Page    int `json:"page"`
-	Results []struct {
-		Adult            bool    `json:"adult"`
-		BackdropPath     string  `json:"backdrop_path"`
-		GenreIds         []int   `json:"genre_ids"`
-		ID               int     `json:"id"`
-		OriginalLanguage string  `json:"original_language"`
-		OriginalTitle    string  `json:"original_title"`
-		Overview         string  `json:"overview"`
-		Popularity       float64 `json:"popularity"`
-		PosterPath       string  `json:"poster_path"`
-		ReleaseDate      string  `json:"release_date"`
-		Title            string  `json:"title"`
-		Video            bool    `json:"video"`
-		VoteAverage      float64 `json:"vote_average"`
-		VoteCount        int     `json:"vote_count"`
-		MediaType        string  `json:"media_type"` // API req doesn't include this, we will add it in our service.
-	} `json:"results"`
-	TotalPages   int `json:"total_pages"`
-	TotalResults int `json:"total_results"`
+	TMDBSearchResponse[TMDBSearchMovieResult]
+}
+
+type TMDBSearchShowsResult struct {
+	Adult            bool     `json:"adult"`
+	BackdropPath     string   `json:"backdrop_path"`
+	GenreIds         []int    `json:"genre_ids"`
+	ID               int      `json:"id"`
+	OriginCountry    []string `json:"origin_country"`
+	OriginalLanguage string   `json:"original_language"`
+	OriginalName     string   `json:"original_name"`
+	Overview         string   `json:"overview"`
+	Popularity       float64  `json:"popularity"`
+	PosterPath       string   `json:"poster_path"`
+	FirstAirDate     string   `json:"first_air_date"`
+	Name             string   `json:"name"`
+	VoteAverage      float64  `json:"vote_average"`
+	VoteCount        int      `json:"vote_count"`
+	MediaType        string   `json:"media_type"` // API req doesn't include this, we will add it in our service.
 }
 
 type TMDBSearchShowsResponse struct {
-	Page    int `json:"page"`
-	Results []struct {
-		Adult            bool     `json:"adult"`
-		BackdropPath     string   `json:"backdrop_path"`
-		GenreIds         []int    `json:"genre_ids"`
-		ID               int      `json:"id"`
-		OriginCountry    []string `json:"origin_country"`
-		OriginalLanguage string   `json:"original_language"`
-		OriginalName     string   `json:"original_name"`
-		Overview         string   `json:"overview"`
-		Popularity       float64  `json:"popularity"`
-		PosterPath       string   `json:"poster_path"`
-		FirstAirDate     string   `json:"first_air_date"`
-		Name             string   `json:"name"`
-		VoteAverage      float64  `json:"vote_average"`
-		VoteCount        int      `json:"vote_count"`
-		MediaType        string   `json:"media_type"` // API req doesn't include this, we will add it in our service.
-	} `json:"results"`
-	TotalPages   int `json:"total_pages"`
-	TotalResults int `json:"total_results"`
+	TMDBSearchResponse[TMDBSearchShowsResult]
+}
+
+type TMDBSearchPeopleResult struct {
+	Adult              bool    `json:"adult"`
+	Gender             int     `json:"gender"`
+	ID                 int     `json:"id"`
+	KnownForDepartment string  `json:"known_for_department"`
+	Name               string  `json:"name"`
+	OriginalName       string  `json:"original_name"`
+	Popularity         float64 `json:"popularity"`
+	ProfilePath        string  `json:"profile_path"`
+	MediaType          string  `json:"media_type"` // API req doesn't include this, we will add it in our service.
+	KnownFor           []struct {
+		Adult            bool    `json:"adult"`
+		BackdropPath     string  `json:"backdrop_path"`
+		ID               int     `json:"id"`
+		Title            string  `json:"title"`
+		OriginalLanguage string  `json:"original_language"`
+		OriginalTitle    string  `json:"original_title"`
+		Overview         string  `json:"overview"`
+		PosterPath       string  `json:"poster_path"`
+		MediaType        string  `json:"media_type"`
+		GenreIds         []int   `json:"genre_ids"`
+		Popularity       float64 `json:"popularity"`
+		ReleaseDate      string  `json:"release_date"`
+		Video            bool    `json:"video"`
+		VoteAverage      float64 `json:"vote_average"`
+		VoteCount        int     `json:"vote_count"`
+	} `json:"known_for"`
 }
 
 type TMDBSearchPeopleResponse struct {
-	Page    int `json:"page"`
-	Results []struct {
-		Adult              bool    `json:"adult"`
-		Gender             int     `json:"gender"`
-		ID                 int     `json:"id"`
-		KnownForDepartment string  `json:"known_for_department"`
-		Name               string  `json:"name"`
-		OriginalName       string  `json:"original_name"`
-		Popularity         float64 `json:"popularity"`
-		ProfilePath        string  `json:"profile_path"`
-		MediaType          string  `json:"media_type"` // API req doesn't include this, we will add it in our service.
-		KnownFor           []struct {
-			Adult            bool    `json:"adult"`
-			BackdropPath     string  `json:"backdrop_path"`
-			ID               int     `json:"id"`
-			Title            string  `json:"title"`
-			OriginalLanguage string  `json:"original_language"`
-			OriginalTitle    string  `json:"original_title"`
-			Overview         string  `json:"overview"`
-			PosterPath       string  `json:"poster_path"`
-			MediaType        string  `json:"media_type"`
-			GenreIds         []int   `json:"genre_ids"`
-			Popularity       float64 `json:"popularity"`
-			ReleaseDate      string  `json:"release_date"`
-			Video            bool    `json:"video"`
-			VoteAverage      float64 `json:"vote_average"`
-			VoteCount        int     `json:"vote_count"`
-		} `json:"known_for"`
-	} `json:"results"`
-	TotalPages   int `json:"total_pages"`
-	TotalResults int `json:"total_results"`
+	TMDBSearchResponse[TMDBSearchPeopleResult]
+}
+
+type TMDBFindByExternalIdResponse struct {
+	// These are all a TMDBSearchMultiResults so our search func can easily
+	// combine all of them into one []TMDBSearchMultiResults for response
+	// to client (seems not easy to convert to TMDBSearchMultiResults for
+	// concatenation after unmarshalling to correct type).
+	MovieResults     []TMDBSearchMultiResults `json:"movie_results"`
+	PersonResults    []TMDBSearchMultiResults `json:"person_results"`
+	TvResults        []TMDBSearchMultiResults `json:"tv_results"`
+	TvSeasonResults  []TMDBSearchMultiResults `json:"tv_season_results"`
+	TvEpisodeResults []TMDBSearchMultiResults `json:"tv_episode_results"`
 }
 
 type TMDBContentDetails struct {

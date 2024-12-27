@@ -18,6 +18,8 @@ type ContentType string
 const (
 	MOVIE ContentType = "movie"
 	SHOW  ContentType = "tv"
+	// Show episode
+	SHOW_EPISODE ContentType = "tv_episode"
 )
 
 var ContentStore = persistence.NewInMemoryStore(time.Hour * 24)
@@ -90,7 +92,7 @@ func saveContent(db *gorm.DB, c *Content, onlyUpdate bool) error {
 	// If row created, download the image
 	if res.RowsAffected > 0 {
 		slog.Debug("saveContent: Downloading poster.")
-		err := download("https://image.tmdb.org/t/p/w500"+c.PosterPath, path.Join(DataPath, "img", c.PosterPath))
+		err := download("https://image.tmdb.org/t/p/w500"+c.PosterPath, path.Join(DataPath, "img", c.PosterPath), false)
 		if err != nil {
 			slog.Error("saveContent: Failed to download content image!", "error", err.Error())
 		}
@@ -302,6 +304,33 @@ func searchPeople(query string, pageNum int) (TMDBSearchPeopleResponse, error) {
 		resp.Results[i].MediaType = "person"
 	}
 	return *resp, nil
+}
+
+// Search for content by an external id (imdb, etc).
+// Defaults to imdb if no source if provided (probably most common).
+func searchByExternalId(id string, source string) (TMDBSearchMultiResponse, error) {
+	resp := new(TMDBFindByExternalIdResponse)
+	if source == "" {
+		source = "imdb"
+	}
+	err := tmdbRequest("/find/"+id, map[string]string{"external_source": source + "_id"}, &resp)
+	if err != nil {
+		slog.Error("Failed to complete find/external_id request!", "error", err.Error())
+		return TMDBSearchMultiResponse{}, errors.New("failed to complete find/external_id request")
+	}
+	comb := []TMDBSearchMultiResults{}
+	comb = append(comb, resp.MovieResults...)
+	comb = append(comb, resp.TvResults...)
+	comb = append(comb, resp.PersonResults...)
+	comb = append(comb, resp.TvSeasonResults...)
+	comb = append(comb, resp.TvEpisodeResults...)
+	return TMDBSearchMultiResponse{TMDBSearchResponse: TMDBSearchResponse[TMDBSearchMultiResults]{
+		Results:      comb,
+		TotalResults: len(comb),
+		// Just providing these so we don't break frontend pagination logic.
+		TotalPages: 1,
+		Page:       1,
+	}}, nil
 }
 
 func movieDetails(db *gorm.DB, id string, country string, rParams map[string]string) (TMDBMovieDetails, error) {

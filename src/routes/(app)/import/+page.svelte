@@ -30,7 +30,7 @@
   let isDragOver = false;
   let isLoading = false;
 
-  function processFiles(files?: FileList | null) {
+  function processFiles(files: FileList | null | undefined, type: "text-list" | "tmdb" | "imdb") {
     try {
       console.log("processFiles", files);
       if (!files || files?.length <= 0) {
@@ -53,18 +53,25 @@
       }
       // Currently only support for importing one file at a time
       const file = files[0];
-      if (file.type !== "text/plain" && file.type !== "text/csv") {
+      if (type === "text-list" && file.type !== "text/plain") {
         notify({
           type: "error",
-          text: "Currently only text and csv (TMDb export) files are supported"
+          text: "Text list export must be a .txt file!"
+        });
+        isLoading = false;
+        isDragOver = false;
+        return;
+      }
+      if ((type === "tmdb" || type === "imdb") && file.type !== "text/csv") {
+        notify({
+          type: "error",
+          text: `${type} export must be a .csv file!`
         });
         isLoading = false;
         isDragOver = false;
         return;
       }
       const r = new FileReader();
-      let type: "text-list" | "tmdb" = "text-list";
-      if (file.type === "text/csv") type = "tmdb";
       r.addEventListener(
         "load",
         () => {
@@ -478,26 +485,30 @@
               : [],
 
           // Episode ratings are on a separate field: "reviews"
-          watchedEpisodes: v.seen_history?.map((episode: any) => ({
-            status: episode.progress === "100" ? "FINISHED" : "WATCHING",
+          watchedEpisodes:
+            v.lot === "show"
+              ? v.seen_history?.map((episode: any) => ({
+                  status: episode.progress === "100" ? "FINISHED" : "WATCHING",
 
-            // Linear :( search the reviews for a match
-            rating:
-              validifyRating(
-                Number(
-                  (
-                    v.reviews?.find(
-                      (review: any) =>
-                        review.show_season_number === episode.show_season_number &&
-                        review.show_episode_number === episode.show_episode_number
-                    ) || {}
-                  )?.rating
-                )
-              ) || null,
+                  // Linear :( search the reviews for a match
+                  rating:
+                    validifyRating(
+                      Number(
+                        (
+                          v.reviews?.find(
+                            (review: any) =>
+                              review.show_season_number === episode.show_season_number &&
+                              review.show_episode_number === episode.show_episode_number
+                          ) || {}
+                        )?.rating
+                      )
+                    ) || null,
 
-            seasonNumber: episode.show_season_number,
-            episodeNumber: episode.show_episode_number
-          }))
+                  seasonNumber: episode.show_season_number,
+                  episodeNumber: episode.show_episode_number,
+                  createdAt: episode.ended_on ? new Date(episode.ended_on) : undefined
+                }))
+              : undefined
         };
         toImport.push(t);
       }
@@ -650,18 +661,21 @@
       {:else}
         <DropFileButton text="Watcharr Export" filesSelected={(f) => processWatcharrFile(f)} />
 
-        <DropFileButton text=".txt list" filesSelected={(f) => processFiles(f)} />
+        <!-- TODO Add info... on what a '.txt list' means and supports -->
+        <DropFileButton text=".txt list" filesSelected={(f) => processFiles(f, "text-list")} />
 
         <DropFileButton
           icon="themoviedb"
-          text=".csv TMDb Export"
-          filesSelected={(f) => processFiles(f)}
+          text="TMDb"
+          filesSelected={(f) => processFiles(f, "tmdb")}
         />
 
         <button class="plain" on:click={() => goto("/import/trakt")}>
           <Icon i="trakt" wh="100%" />
           <h4 class="norm">Trakt Import</h4>
         </button>
+
+        <DropFileButton icon="imdb" text="IMDb" filesSelected={(f) => processFiles(f, "imdb")} />
 
         <DropFileButton
           icon="movary"

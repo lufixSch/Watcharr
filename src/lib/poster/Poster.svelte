@@ -28,24 +28,35 @@
   export let extraDetails: PosterExtraDetails | undefined = undefined;
   export let fluidSize = false;
   export let pinned = false;
+  /**
+   * If the poster should be hidden if not on users watched list (no `id`).
+   * Doing it this way so we can quickly hide posters with css and avoid
+   * triggering the #each block again where we create poster lists,
+   * which makes this functionality more performant (because we don't have
+   * support for virtual lists yet, we are re-creating all posters in places).
+   * Notably 'On my list' feature (eg on person page).
+   */
+  export let hideIfNotOnList = false;
   // When provided, default click handlers will instead run this callback.
   export let onClick: (() => void) | undefined = undefined;
 
   // If poster is active (scaled up)
   let posterActive = false;
+  // If mouse in on poster. Added to fix #656.
+  let mouseOverPoster = false;
 
   let containerEl: HTMLDivElement;
 
-  const title = media.title || media.name;
+  $: title = media.title || media.name;
   // For now, if the content is on watched list, we can assume we have a local
   // cached image. Could be improved, since we could have a cached image for
   // show not on someone elses watched list.
-  const poster = id
+  $: poster = id
     ? `${baseURL}/img${media.poster_path}`
     : `https://image.tmdb.org/t/p/w500${media.poster_path}`;
-  const link = media.id ? `/${media.media_type}/${media.id}` : undefined;
-  const dateStr = media.release_date || media.first_air_date;
-  const year = dateStr ? new Date(dateStr).getFullYear() : undefined;
+  $: link = media.id ? `/${media.media_type}/${media.id}` : undefined;
+  $: dateStr = media.release_date || media.first_air_date;
+  $: year = dateStr ? new Date(dateStr).getFullYear() : undefined;
 
   function handleStarClick(r: number) {
     if (r == rating) return;
@@ -66,7 +77,6 @@
   }
 
   function handleInnerKeyUp(e: KeyboardEvent) {
-    console.log(e.target);
     if (e.key === "Enter" && (e.target as HTMLElement)?.id === "ilikemoviessueme") {
       if (typeof onClick !== "undefined") {
         onClick();
@@ -94,6 +104,7 @@
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
 <li
   on:mouseenter={(e) => {
+    mouseOverPoster = true;
     if (!posterActive) calculateTransformOrigin(e);
     if (!isTouch()) {
       posterActive = true;
@@ -106,12 +117,15 @@
     }
   }}
   on:focusout={() => {
-    if (!isTouch()) {
+    if (!isTouch() && !mouseOverPoster) {
       // Only on !isTouch (to match focusin) to avoid breaking a tap and hold on link on mobile.
+      // and only if mouse isn't still over the poster, fixes focusout on click of rating/status
+      // poster buttons causing poster to shrink until refocused with click/mouse out & in again.
       posterActive = false;
     }
   }}
   on:mouseleave={() => {
+    mouseOverPoster = false;
     posterActive = false;
     const ae = document.activeElement;
     if (
@@ -135,7 +149,7 @@
     }
   }}
   on:keypress={() => console.log("on kpress")}
-  class={`${posterActive ? "active " : ""}${pinned ? "pinned " : ""}`}
+  class={`${posterActive ? "active " : ""}${pinned ? "pinned " : ""}${hideIfNotOnList && !id ? "hidden " : ""}`}
 >
   <div
     class={`container${!poster || !media.poster_path ? " details-shown" : ""}`}
@@ -196,6 +210,10 @@
 </li>
 
 <style lang="scss">
+  li.hidden {
+    display: none;
+  }
+
   li.active {
     cursor: pointer;
   }

@@ -5,12 +5,14 @@
   import Poster from "@/lib/poster/Poster.svelte";
   import PosterList from "@/lib/poster/PosterList.svelte";
   import Spinner from "@/lib/Spinner.svelte";
-  import { removeWatched, updateWatched } from "@/lib/util/api";
+  import DropDown from "@/lib/DropDown.svelte";
   import { getWatchedDependedProps } from "@/lib/util/helpers";
   import { watchedList } from "@/store";
   import type { TMDBPersonCombinedCredits, TMDBPersonDetails } from "@/types";
   import axios from "axios";
   import { onMount } from "svelte";
+  import Checkbox from "@/lib/Checkbox.svelte";
+  import Icon from "@/lib/Icon.svelte";
 
   export let data;
 
@@ -19,6 +21,9 @@
   let personId: number | undefined;
   let person: TMDBPersonDetails | undefined;
   let pageError: Error | undefined;
+  let sortOption = "Vote count";
+  let credits: TMDBPersonCombinedCredits | undefined;
+  let onMyListFilter = false;
 
   onMount(() => {
     const unsubscribe = page.subscribe((value) => {
@@ -31,32 +36,72 @@
     return unsubscribe;
   });
 
-  $: {
-    (async () => {
-      try {
-        person = undefined;
-        pageError = undefined;
-        if (!personId) {
-          return;
-        }
-        const data = await getPerson(personId);
-        person = data;
-      } catch (err: any) {
-        person = undefined;
-        pageError = err;
+  $: if (personId) {
+    fetchPersonData();
+  }
+
+  $: if (sortOption && credits) {
+    sortCredits(sortOption);
+  }
+
+  async function fetchPersonData() {
+    try {
+      person = undefined;
+      pageError = undefined;
+      if (!personId) {
+        return;
       }
-    })();
+      person = await getPerson(personId);
+      await updatePersonCredits();
+      sortCredits(sortOption);
+    } catch (err: any) {
+      person = undefined;
+      pageError = err;
+    }
   }
 
   async function getPerson(id: number) {
     return (await axios.get(`/content/person/${id}`)).data as TMDBPersonDetails;
   }
 
-  async function getPersonCredits() {
-    const credits = (await axios.get(`/content/person/${data.personId}/credits`))
+  async function updatePersonCredits() {
+    credits = (await axios.get(`/content/person/${data.personId}/credits`))
       .data as TMDBPersonCombinedCredits;
-    credits.cast = credits.cast?.sort((a, b) => b.vote_count - a.vote_count);
-    return credits;
+    credits.cast = credits.cast.filter((v, i, a) => a.findIndex((t) => t.id === v.id) === i); // remove duplicate entries. If an actor has multiple roles in a single movie, it would otherwise show up multiple times
+  }
+
+  function sortCredits(sortOption: string) {
+    if (!credits || !credits.cast) return;
+    switch (sortOption) {
+      case "Vote count":
+        credits.cast.sort((a, b) => b.vote_count - a.vote_count);
+        break;
+      case "Newest":
+        credits.cast.sort((a, b) => {
+          const dateA = new Date(a.release_date || a.first_air_date).valueOf();
+          const dateB = new Date(b.release_date || b.first_air_date).valueOf();
+
+          // if a date is missing it should be sorted first since it's probably a future release
+          if (!a.release_date && !a.first_air_date) return -1;
+          if (!b.release_date && !b.first_air_date) return 1;
+
+          return dateB - dateA;
+        });
+        break;
+      case "Oldest":
+        credits.cast.sort((a, b) => {
+          const dateA = new Date(a.release_date || a.first_air_date).valueOf();
+          const dateB = new Date(b.release_date || b.first_air_date).valueOf();
+
+          // if a date is missing it should be sorted last since it's probably a future release
+          if (!a.release_date && !a.first_air_date) return 1;
+          if (!b.release_date && !b.first_air_date) return -1;
+
+          return dateA - dateB;
+        });
+        break;
+    }
+    credits.cast = credits.cast;
   }
 </script>
 
@@ -127,20 +172,43 @@
           </div>
         </div>
       </div>
-
-      {#await getPersonCredits()}
+      {#if credits}
+        {#if credits?.cast?.length > 0}
+          <div class="filters">
+            <div class="listFilter">
+              <span>On my list</span>
+              <Checkbox name="On my list" bind:value={onMyListFilter} />
+            </div>
+            <DropDown
+              bind:active={sortOption}
+              placeholder="Vote count"
+              options={["Vote count", "Newest", "Oldest"]}
+              isDropDownItem={false}
+              showActiveElementsInOptions={true}
+            />
+          </div>
+          <div class="page">
+            <PosterList>
+              {#each credits.cast as c (c.id)}
+                <Poster
+                  media={c}
+                  {...getWatchedDependedProps(c.id, c.media_type, wList)}
+                  fluidSize
+                  hideIfNotOnList={onMyListFilter}
+                />
+              {/each}
+            </PosterList>
+          </div>
+        {:else}
+          <div class="no-credits-message">
+            <Icon i="star" wh={80} />
+            <h2 class="norm">We found no credits!</h2>
+            <h4 class="norm">It seems that this person has no credits.</h4>
+          </div>
+        {/if}
+      {:else}
         <Spinner />
-      {:then credits}
-        <div class="page">
-          <PosterList>
-            {#each credits?.cast as c}
-              <Poster media={c} {...getWatchedDependedProps(c.id, c.media_type, wList)} fluidSize />
-            {/each}
-          </PosterList>
-        </div>
-      {:catch err}
-        <Error pretty="Failed to load credits!" error={err} />
-      {/await}
+      {/if}
     {:else}
       person not found
     {/if}
@@ -150,6 +218,25 @@
 </div>
 
 <style lang="scss">
+  .filters {
+    align-items: center;
+    display: flex;
+    justify-content: flex-end;
+    gap: 30px;
+    margin: 0 auto;
+    padding-left: 20px;
+    padding-right: 20px;
+    width: 100%;
+    /* Same as in PosterList */
+    max-width: 1200px;
+
+    .listFilter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+  }
+
   .content {
     position: relative;
     color: white;
@@ -256,5 +343,21 @@
     align-items: center;
     gap: 30px;
     padding: 10px 0px;
+  }
+
+  .no-credits-message {
+    display: flex;
+    flex-flow: column;
+    gap: 5px;
+    align-items: center;
+    margin-top: 20px;
+
+    h2 {
+      margin-top: 10px;
+    }
+
+    h4 {
+      font-weight: normal;
+    }
   }
 </style>

@@ -22,12 +22,14 @@
     type ImportResponse,
     type ContentSearchTv,
     type ContentSearchMovie,
-    type ImportedList
+    type ImportedList,
+    type WatchedStatus
   } from "@/types";
   import axios from "axios";
   import { onDestroy } from "svelte";
   import { get } from "svelte/store";
   import papa from "papaparse";
+  import Status from "@/lib/Status.svelte";
 
   const wList = get(watchedList);
 
@@ -49,6 +51,9 @@
   // Set when current item being imported gets an IMPORT_MULTI
   // response, which then shows the modal for user to pick correct item.
   let importMultiItem: ImportedListItemMultiProblem | undefined;
+  // Set when user clicks 'Change Statuses' button for the change all
+  // statuses modal.
+  let changeAllStatusesModalCb: ((newStatus?: WatchedStatus) => void) | undefined;
 
   async function getList() {
     const list = get(importedList);
@@ -115,6 +120,88 @@
             text: "Failed to process an item!"
           });
         }
+      }
+    } else if (list?.type === "imdb") {
+      // There are different types of imdb exports (ratings & watchlist/list),
+      // there are common keys between these types that we use below so should
+      // be okay with importing either.
+      importText = "IMDb";
+      const s = papa.parse<any>(list.data.trim(), { header: true });
+      console.debug("parsed csv", s);
+      let anySkipped = false;
+      // Sort so that episodes comes last, so they are imported last.
+      s.data?.sort((a, b) => {
+        const aType = a["Title Type"]?.toLowerCase();
+        if (aType === "tv episode") {
+          return 1;
+        }
+        const bType = b["Title Type"]?.toLowerCase();
+        if (bType === "tv episode") {
+          return -1;
+        }
+        return 0;
+      });
+      for (let i = 0; i < s.data.length; i++) {
+        try {
+          const el = s.data[i] as any;
+          if (el) {
+            const imdbId = el["Const"];
+            const type = el["Title Type"]?.toLowerCase();
+            // Skip if no name or tmdb id
+            if (!el.Title && !imdbId) {
+              console.warn("Skipping item with no title or imdb id", el);
+              anySkipped = true;
+              continue;
+            }
+            if (!type) {
+              console.warn("Skipping item with no type", el);
+              anySkipped = true;
+              continue;
+            }
+            const l: ImportedList = { name: el.Title };
+            const year = el["Release Date"] ? new Date(el["Release Date"]) : undefined;
+            if (year) {
+              l.year = String(year.getFullYear());
+            }
+            if (type === "movie") {
+              l.type = "movie";
+            } else if (type === "tv series") {
+              l.type = "tv";
+            } else if (type === "tv episode") {
+              l.type = "tv_episode";
+            } else {
+              console.warn("Skipping item with invalid type", `(${type})`, el);
+              anySkipped = true;
+              continue;
+            }
+            if (imdbId) {
+              l.imdbId = imdbId;
+            }
+            if (el["Your Rating"]) {
+              l.rating = Math.floor(Number(el["Your Rating"]));
+            }
+            if (el["Date Rated"]) {
+              l.ratingCustomDate = new Date(el["Date Rated"]);
+            }
+            rList.push(l);
+          }
+        } catch (err) {
+          console.error("Failed to process an item!", err);
+          notify({
+            type: "error",
+            text: "Failed to process an item!"
+          });
+        }
+      }
+      notify({
+        text: "Any tv episodes will be added to the bottom of the table, don't change the Type on these!",
+        time: 20000
+      });
+      if (anySkipped) {
+        notify({
+          type: "error",
+          text: "Some items with invalid data may have been skipped (check source data for missing ids/titles or look in console for more details)."
+        });
       }
     } else if (list?.type === "movary") {
       importText = "Movary";
@@ -339,7 +426,11 @@
       parsedImportedList.set(rList);
       goto("/import/some-failed");
     } else {
-      notify({ type: "success", text: "All content successfully imported!" });
+      notify({
+        type: "success",
+        text: "All content successfully imported! Try refreshing if you are missing data.",
+        time: 15000
+      });
       goto("/");
     }
   }
@@ -402,6 +493,40 @@
         res(0);
       }
     });
+  }
+
+  /**
+   * Helper to allow user to quickly update
+   * all statuses to a new one.
+   */
+  function changeAllStatuses() {
+    changeAllStatusesModalCb = (newStatus) => {
+      try {
+        console.debug("changeAllStatusesModalCb: newStatus:", newStatus);
+        if (!newStatus) {
+          // User cancelled flow
+          changeAllStatusesModalCb = undefined;
+          return;
+        }
+        if (!rList) {
+          console.error("changeAllStatusesModalCb: No list to modify!");
+          changeAllStatusesModalCb = undefined;
+          return;
+        }
+        for (let i = 0; i < rList.length; i++) {
+          const r = rList[i];
+          r.status = newStatus;
+        }
+        rList = rList;
+      } catch (err) {
+        console.error("changeAllStatusesModalCb: Failed!", err);
+        notify({
+          type: "error",
+          text: "Failed when updating all statuses. Please try again!"
+        });
+      }
+      changeAllStatusesModalCb = undefined;
+    };
   }
 </script>
 
@@ -507,8 +632,24 @@
         </table>
         <div class="btns">
           <button on:click={() => goto("/import")}><Icon i="arrow" />Back</button>
+          <button on:click={() => changeAllStatuses()} disabled={isImporting}>
+            Change Statuses
+          </button>
           <button on:click={startImport} disabled={isImporting}>Start Importing</button>
         </div>
+        {#if typeof changeAllStatusesModalCb === "function"}
+          <Modal
+            title="Select a New Status"
+            desc="Override the status for all content in the table"
+            maxWidth="600px"
+            onClose={() =>
+              typeof changeAllStatusesModalCb === "function"
+                ? changeAllStatusesModalCb()
+                : undefined}
+          >
+            <Status status={undefined} onChange={changeAllStatusesModalCb} />
+          </Modal>
+        {/if}
       {:else}
         <h2>No list</h2>
       {/if}
@@ -613,6 +754,7 @@
     display: flex;
     flex-flow: row;
     margin-top: 20px;
+    gap: 5px;
 
     button {
       width: max-content;

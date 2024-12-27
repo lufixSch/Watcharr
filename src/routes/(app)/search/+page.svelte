@@ -4,7 +4,7 @@
   import { searchQuery, serverFeatures, watchedList } from "@/store";
   import PageError from "@/lib/PageError.svelte";
   import Spinner from "@/lib/Spinner.svelte";
-  import axios, { type GenericAbortSignal } from "axios";
+  import axios from "axios";
   import { getWatchedDependedProps, getPlayedDependedProps } from "@/lib/util/helpers";
   import PersonPoster from "@/lib/poster/PersonPoster.svelte";
   import type {
@@ -25,7 +25,7 @@
   import GamePoster from "@/lib/poster/GamePoster.svelte";
   import { get } from "svelte/store";
   import Icon from "@/lib/Icon.svelte";
-  import { afterNavigate } from "$app/navigation";
+  import { afterNavigate, goto } from "$app/navigation";
   import { page } from "$app/stores";
 
   type GameWithMediaType = GameSearch & { media_type: "game" };
@@ -49,17 +49,19 @@
   const infiniteScrollThreshold = 150;
   let reqController = new AbortController();
 
+  $: query = data?.query;
   $: searchQ = $searchQuery;
   $: wList = $watchedList;
 
   async function searchMovies(query: string, page: number) {
     try {
-      const movies = await axios.get<MoviesSearchResponse>(
-        `/content/search/movie/${query}?page=${page}`,
-        {
-          signal: reqController.signal
-        }
-      );
+      const movies = await axios.get<MoviesSearchResponse>(`/content/search/movie`, {
+        params: {
+          q: encodeURIComponent(query),
+          page
+        },
+        signal: reqController.signal
+      });
       return movies;
     } catch (err) {
       console.error("Movies search failed!", err);
@@ -69,12 +71,13 @@
 
   async function searchTv(query: string, page: number) {
     try {
-      const shows = await axios.get<ShowsSearchResponse>(
-        `/content/search/tv/${query}?page=${page}`,
-        {
-          signal: reqController.signal
-        }
-      );
+      const shows = await axios.get<ShowsSearchResponse>(`/content/search/tv`, {
+        params: {
+          q: encodeURIComponent(query),
+          page
+        },
+        signal: reqController.signal
+      });
       return shows;
     } catch (err) {
       console.error("Tv search failed!", err);
@@ -84,12 +87,13 @@
 
   async function searchPeople(query: string, page: number) {
     try {
-      const people = await axios.get<PeopleSearchResponse>(
-        `/content/search/person/${query}?page=${page}`,
-        {
-          signal: reqController.signal
-        }
-      );
+      const people = await axios.get<PeopleSearchResponse>(`/content/search/person`, {
+        params: {
+          q: encodeURIComponent(query),
+          page
+        },
+        signal: reqController.signal
+      });
       return people;
     } catch (err) {
       console.error("People search failed!", err);
@@ -99,7 +103,11 @@
 
   async function searchMulti(query: string, page: number) {
     try {
-      return await axios.get<ContentSearch>(`/content/search/multi/${query}?page=${page}`, {
+      return await axios.get<ContentSearch>(`/content/search/multi`, {
+        params: {
+          q: encodeURIComponent(query),
+          page
+        },
         signal: reqController.signal
       });
     } catch (err) {
@@ -120,7 +128,11 @@
         console.debug("game search is not enabled on this server");
         return { data: [] };
       }
-      const games = await axios.get<GameSearch[]>(`/game/search/${query}`, {
+      const games = await axios.get<GameSearch[]>(`/game/search`, {
+        params: {
+          q: encodeURIComponent(query),
+          page
+        },
         signal: reqController.signal
       });
       return {
@@ -135,20 +147,114 @@
     }
   }
 
+  async function searchExternalId(id: string, provider: string) {
+    try {
+      return await axios.get<ContentSearch>(`/content/search/ext/${id}/${provider}`, {
+        signal: reqController.signal
+      });
+    } catch (err) {
+      console.error(`External id search failed!`, id, provider, err);
+      throw err;
+    }
+  }
+
+  function checkForExternalIdSearch(query: string) {
+    const spl = query.split(":");
+    if (spl.length !== 2) {
+      // Only ever accept one ':' in query.
+      console.debug(
+        "checkForExternalIdSearch: One lonely separator not found.. stopping check here."
+      );
+      return;
+    }
+    if (!spl[1]) {
+      console.info("checkForExternalIdSearch: No id found.");
+      return;
+    }
+    // Check if first part of query is a supported provider.
+    let p = spl[0]?.toLowerCase();
+    switch (p) {
+      // Default names that are supported right out of the box
+      case "imdb":
+      case "tvdb":
+      case "youtube":
+      case "wikidata":
+      case "facebook":
+      case "instagram":
+      case "twitter":
+      case "tiktok":
+        break;
+      // Any aliases we want to support
+      case "i":
+      case "imd":
+        p = "imdb";
+        break;
+      case "wd":
+      case "wdt":
+        p = "wikidata";
+        break;
+      case "yt":
+        p = "youtube";
+        break;
+      case "thetvdb":
+        p = "tvdb";
+        break;
+      // If none match, then is invalid provider.
+      default:
+        console.info("checkForExternalIdSearch: Invalid provider found:", p);
+        return;
+    }
+    console.debug("checkForExternalIdSearch: Found required params:", p, spl[1]);
+    return {
+      provider: p,
+      id: spl[1]
+    };
+  }
+
   async function search(query: string) {
     console.debug("search: query:", query);
     if (searchRunning) {
       console.debug("search: already running");
       return;
     }
-    if (curPage === maxContentPage) {
+    if (curPage >= maxContentPage) {
       console.debug("search: max page reached");
       return;
     }
     searchRunning = true;
+    const extProvider = checkForExternalIdSearch(query);
+    const isExtSearch = !!extProvider;
     reqController = new AbortController();
     try {
-      if (activeSearchFilter) {
+      if (isExtSearch) {
+        console.log("Search: Performing external id search.");
+        const resp = await searchExternalId(extProvider.id, extProvider.provider);
+        const data = resp.data;
+        if (!data || !data.results) {
+          console.warn("Search: No results from external id search.");
+          return;
+        }
+        if (data.results.length === 1 && data.results[0].media_type && data.results[0].id) {
+          console.info(
+            "Search: Only one result from external id search. Redirecting..",
+            data.results[0]
+          );
+          const mediaType = data.results[0].media_type;
+          if (mediaType !== "movie" && mediaType !== "tv" && mediaType !== "person") {
+            console.info(
+              "Search: Unsupported media type found in only result.. not redirecting.",
+              mediaType
+            );
+          } else {
+            goto(`/${data.results[0].media_type}/${data.results[0].id}`);
+            return;
+          }
+        }
+        console.info("Search: Multiple results from external id search.");
+        allSearchResults.push(...data.results);
+        searchResults = allSearchResults;
+        curPage++;
+      } else if (activeSearchFilter) {
         // If we have a search filter selected, search for just one specific type of content.
         console.log("Search: A filter is active:", activeSearchFilter);
         let cdata;
@@ -235,7 +341,7 @@
   }
 
   async function doCleanSearch() {
-    if (!data.slug) {
+    if (!query) {
       console.error("doCleanSearch: No query to use.");
       return;
     }
@@ -243,11 +349,11 @@
     curPage = 0;
     allSearchResults = [];
     searchResults = [];
-    search(data.slug);
+    search(query);
   }
 
   async function searchUsers(query: string) {
-    return (await axios.get(`/user/search/${query}`)).data as PublicUser[];
+    return (await axios.get(`/user/search`, { params: { q: query } })).data as PublicUser[];
   }
 
   function setActiveSearchFilter(to: SearchFilterTypes) {
@@ -270,15 +376,15 @@
     ) {
       console.log("reached end");
       window.removeEventListener("scroll", infiniteScroll);
-      if (data.slug) await search(data.slug);
+      if (query) await search(query);
       window.addEventListener("scroll", infiniteScroll);
       console.debug(`Page: ${curPage} / ${maxContentPage}`);
     }
   }
 
   onMount(() => {
-    if (!searchQ && data.slug) {
-      searchQuery.set(data.slug);
+    if (!searchQ && query) {
+      searchQuery.set(query);
     }
     doCleanSearch();
 
@@ -292,7 +398,7 @@
   });
 
   afterNavigate((e) => {
-    if (!e.from?.route?.id?.toLowerCase()?.includes("/search/")) {
+    if (!e.from?.route?.id?.toLowerCase()?.includes("/search")) {
       // AfterNavigate will also be called when this page is mounted,
       // but that won't work for us since the OnMount hook also runs
       // a clean search, which can cause errors when both ran at same
@@ -302,7 +408,7 @@
       // use that. The only alternative to only run this hook after a
       // navigation on the search page (query change), seems to be
       // checking the `from` property an making sure it's from the
-      // `/search/` route already.
+      // `/search` route already.
       return;
     }
     console.log("Query changed (or just loaded first query), performing search");
@@ -319,15 +425,14 @@
 </script>
 
 <svelte:head>
-  <title>Search Results{data?.slug ? ` for '${data?.slug}'` : ""}</title>
+  <title>Search Results{query ? ` for '${query}'` : ""}</title>
 </svelte:head>
 
 <!-- <span style="position: sticky;top: 70px;">{curPage} / {maxContentPage}</span> -->
-
 <div class="content">
   <div class="inner">
-    {#if data.slug}
-      {#await searchUsers(data.slug) then results}
+    {#if query}
+      {#await searchUsers(query) then results}
         {#if results?.length > 0}
           <UsersList users={results} />
         {/if}
@@ -387,7 +492,7 @@
                 {...getPlayedDependedProps(w.id, wList)}
                 fluidSize
               />
-            {:else}
+            {:else if w.media_type === "movie" || w.media_type === "tv"}
               <Poster media={w} {...getWatchedDependedProps(w.id, w.media_type, wList)} fluidSize />
             {/if}
           {/each}
@@ -410,7 +515,7 @@
             error={contentSearchErr}
             onRetry={() => {
               contentSearchErr = undefined;
-              search(data.slug);
+              search(query);
             }}
           />
         </div>
